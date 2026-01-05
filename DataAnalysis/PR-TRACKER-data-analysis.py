@@ -144,13 +144,21 @@ df['speed_m_s'] = df['speed_m_s'].replace([np.inf, -np.inf], np.nan).fillna(0)
 df['descent_rate_smooth'] = df['descent_rate_m_s'].rolling(window=5, min_periods=1, center=True).mean()
 df['speed_smooth'] = df['speed_m_s'].rolling(window=5, min_periods=1, center=True).mean()
 
-# calculate glide slope (ratio of forward speed to descent rate)
+# calculate glide slope (ratio of speed to descent rate)
 df['glide_slope'] = df['speed_smooth'] / df['descent_rate_smooth']
+
+
 
 # Only plot data where ctrl_time_seconds >= 0 and <= 355
 df_plot = df[(df['ctrl_time_seconds'] >= 0) & (df['ctrl_time_seconds'] <= 355)].copy()
+df_good_data = df[(df['ctrl_time_seconds'] >= 0) & (df['ctrl_time_seconds'] <= 75)].copy()
+# Calculate average glide slope for the plotted segment
+average_glide_slope = df_plot['glide_slope'].mean()
+average_glide_slope_good = df_good_data['glide_slope'].mean()
+min_glide_slope_good = df_good_data['glide_slope'].min()
+print(f"Average Glide Slope (0-75s): {average_glide_slope_good:.2f}")
 
-# Plot descent rate and forward speed using matplotlib and save to figs/
+# Plot descent rate and speed using matplotlib and save to figs/
 import os
 os.makedirs('figs', exist_ok=True)
 
@@ -160,12 +168,14 @@ axes[0].set_ylabel('Descent rate (m/s)')
 axes[0].grid(True)
 axes[0].legend()
 
-axes[1].plot(df_plot['ctrl_time_seconds'], df_plot['speed_smooth'], color='orange', label='Forward speed (m/s)')
-axes[1].set_ylabel('Forward speed (m/s)')
+axes[1].plot(df_plot['ctrl_time_seconds'], df_plot['speed_smooth'], color='orange', label='Ground speed (m/s)')
+axes[1].set_ylabel('Ground speed (m/s)')
 axes[1].grid(True)
 axes[1].legend()
 
 axes[2].plot(df_plot['ctrl_time_seconds'], df_plot['glide_slope'], color='magenta',label='Glide Slope')
+axes[2].axhline(average_glide_slope_good, color='blue', linestyle='--', label=f'Avg Glide Slope (0-75s): {average_glide_slope:.2f}')
+axes[2].axhline(min_glide_slope_good, color='green', linestyle='--', label=f'Min Glide Slope (0-75s): {min_glide_slope_good:.2f}')
 axes[2].set_xlabel('Ctrl Time (s)')
 axes[2].set_ylabel('Glide Slope')
 axes[2].grid(True)
@@ -175,5 +185,5 @@ plt.suptitle('Descent Rate, Fwd Speed, and Glide Slope')
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 outpath = os.path.join('figs', 'glide_slope.png')
 plt.savefig(outpath, dpi=200)
-print(f"Saved descent and forward speed plot to {outpath}")
+print(f"Saved descent and ground speed plot to {outpath}")
 plt.show()
