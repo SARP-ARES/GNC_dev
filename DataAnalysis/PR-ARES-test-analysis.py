@@ -5,11 +5,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Load the test launch CSV as a pandas DataFrame
-data = pd.read_csv('data/PocketRocket_ARES_Flight_5-24-2025.csv')
+data = pd.read_csv('DataAnalysis/data/PocketRocket_ARES_Flight_5-24-2025.csv')
 
 # Start at zero seconds and zero altitude (AGL)
 data['timestamp_utc'] = data['timestamp_utc'] - data['timestamp_utc'][0] 
 data['altitude_m'] = data['altitude_m'] - data['altitude_m'][0]
+
+print(f"Lat Lon: {data['latitude_deg'][0]}, {data['longitude_deg'][0]}")
+print(f"Apogee Altitude: {data['altitude_m'].max()} m")
 
 def moving_average_same_length(data, window_size):
     # Pad data symmetrically at both ends
