@@ -6,10 +6,19 @@ import plotly.graph_objects as go
 import time
 from datetime import datetime
 
+# Haversine distance (meters) between successive GPS points
+def haversine_m(lat1, lon1, lat2, lon2):
+    R = 6371000.0
+    lat1_r = np.radians(lat1)
+    lat2_r = np.radians(lat2)
+    dlat = lat2_r - lat1_r
+    dlon = np.radians(lon2 - lon1)
+    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1_r) * np.cos(lat2_r) * np.sin(dlon / 2.0) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
 
 # Load the test launch CSV as a pandas DataFrame
 data = pd.read_csv('data/PR-Tracker_05-24-2025_14_21_22.csv')
-
 
 print(data.head())
 
@@ -58,11 +67,29 @@ fig2d.show()
 
 # Ensure cleaned data is sorted by time
 sorted_data = cleaned_data.sort_values(by='TIME')
+# Convert lat/lon to local East/North distances (ft) from the starting position
+R = 6371000.0
+start_lat = np.radians(sorted_data['TRACKER Lat'].iloc[0])
+start_lon = np.radians(sorted_data['TRACKER Lon'].iloc[0])
+lat_r = np.radians(sorted_data['TRACKER Lat'].astype(float))
+lon_r = np.radians(sorted_data['TRACKER Lon'].astype(float))
+
+# Differences in radians
+dlat = lat_r - start_lat
+dlon = lon_r - start_lon
+
+# Local tangent-plane approximation
+east_m = R * dlon * np.cos((lat_r + start_lat) / 2.0)
+north_m = R * dlat
+
+# Convert to feet
+east_ft = east_m * 3.28084
+north_ft = north_m * 3.28084
 
 # 3D Trajectory Plot using Plotly Graph Objects with time in hover
 fig3d = go.Figure(data=[go.Scatter3d(
-    x=sorted_data['TRACKER Lon'],
-    y=sorted_data['TRACKER Lat'],
+    x=east_ft,
+    y=north_ft,
     z=sorted_data['Alt AGL (ft)'],
     mode='markers+lines',
     marker=dict(
@@ -76,15 +103,77 @@ fig3d = go.Figure(data=[go.Scatter3d(
     line=dict(width=2),
     name='Trajectory',
     text=sorted_data['ctrl_time_seconds'],
-    hovertemplate='Ctrl Sequence Time (s): %{text}<br>Lat: %{y}<br>Lon: %{x}<br>Alt(ft): %{z}<extra></extra>'
+    hovertemplate='Ctrl Sequence Time (s): %{text}<br>East (ft): %{x:.1f}<br>North (ft): %{y:.1f}<br>Alt(ft): %{z}<extra></extra>'
 )])
 fig3d.update_layout(
     title='3D Trajectory',
     scene=dict(
-        xaxis_title='Longitude',
-        yaxis_title='Latitude',
+        xaxis_title='East (ft)',
+        yaxis_title='North (ft)',
         zaxis_title='Altitude (AGL, ft)',
-        aspectmode='auto'
+        aspectmode='data'
     ),
 )
 fig3d.show()
+
+# --- Compute descent rate and forward (horizontal) speed, then plot ---
+df = sorted_data.copy()
+
+# Convert altitude from feet to meters and ensure time is numeric
+df['alt_m'] = df['Alt AGL (ft)'] * 0.3048
+df['time_s'] = df['time_in_seconds']
+
+# Sort by time and compute differences
+df = df.sort_values('time_s').reset_index(drop=True)
+df['dt'] = df['time_s'].diff()
+df['dalt'] = df['alt_m'].diff()
+
+# Descent rate in m/s (positive when descending)
+df['descent_rate_m_s'] = -df['dalt'] / df['dt']
+df['descent_rate_m_s'] = df['descent_rate_m_s'].replace([np.inf, -np.inf], np.nan).fillna(0)
+
+# Compute distance moved between rows and forward speed (m/s)
+lat_prev = df['TRACKER Lat'].shift()
+lon_prev = df['TRACKER Lon'].shift()
+df['dist_m'] = haversine_m(lat_prev, lon_prev, df['TRACKER Lat'], df['TRACKER Lon'])
+df['dist_m'] = df['dist_m'].fillna(0)
+df['speed_m_s'] = df['dist_m'] / df['dt']
+df['speed_m_s'] = df['speed_m_s'].replace([np.inf, -np.inf], np.nan).fillna(0)
+
+# Smooth signals with a small rolling window
+df['descent_rate_smooth'] = df['descent_rate_m_s'].rolling(window=5, min_periods=1, center=True).mean()
+df['speed_smooth'] = df['speed_m_s'].rolling(window=5, min_periods=1, center=True).mean()
+
+# calculate glide slope (ratio of forward speed to descent rate)
+df['glide_slope'] = df['speed_smooth'] / df['descent_rate_smooth']
+
+# Only plot data where ctrl_time_seconds >= 0 and <= 355
+df_plot = df[(df['ctrl_time_seconds'] >= 0) & (df['ctrl_time_seconds'] <= 355)].copy()
+
+# Plot descent rate and forward speed using matplotlib and save to figs/
+import os
+os.makedirs('figs', exist_ok=True)
+
+fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+axes[0].plot(df_plot['ctrl_time_seconds'], df_plot['descent_rate_smooth'], label='Descent rate (m/s)')
+axes[0].set_ylabel('Descent rate (m/s)')
+axes[0].grid(True)
+axes[0].legend()
+
+axes[1].plot(df_plot['ctrl_time_seconds'], df_plot['speed_smooth'], color='orange', label='Forward speed (m/s)')
+axes[1].set_ylabel('Forward speed (m/s)')
+axes[1].grid(True)
+axes[1].legend()
+
+axes[2].plot(df_plot['ctrl_time_seconds'], df_plot['glide_slope'], color='magenta',label='Glide Slope')
+axes[2].set_xlabel('Ctrl Time (s)')
+axes[2].set_ylabel('Glide Slope')
+axes[2].grid(True)
+axes[2].legend()
+
+plt.suptitle('Descent Rate, Fwd Speed, and Glide Slope')
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+outpath = os.path.join('figs', 'glide_slope.png')
+plt.savefig(outpath, dpi=200)
+print(f"Saved descent and forward speed plot to {outpath}")
+plt.show()
