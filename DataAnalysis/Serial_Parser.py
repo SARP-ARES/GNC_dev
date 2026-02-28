@@ -2,7 +2,7 @@ import serial
 import time
 
 def catch_data_dump(port_name, baud_rate):
-    with open("data/Flights/FLIGHT_DATA_DUMP.txt", "w") as file:
+    with open("DataAnalysis/data/Flights/FLIGHT_DATA_DUMP_3_cartest4.txt", "w") as file:
         try:
             # Initialize serial with a longer timeout to catch the start
             ser = serial.Serial(port_name, baud_rate, timeout=2)
@@ -57,7 +57,8 @@ def catch_data_dump(port_name, baud_rate):
 
 if __name__ == '__main__':
     # For your Pi 4 or laptop: check if it's '/dev/ttyACM0' or 'COM4'
-    SERIAL_PORT = 'COM4' 
+    # SERIAL_PORT = 'COM4' # for windows
+    SERIAL_PORT = '/dev/cu.usbmodem01234567891' # for mac
     BAUD_RATE = 115200 
 
     catch_data_dump(SERIAL_PORT, BAUD_RATE)
