@@ -1,1 +1,1 @@
-    x=sorted_data['TRACKER Lon'],
+fig.show()
