@@ -7,7 +7,7 @@ from shapely.geometry import LineString
 import geopandas as gpd
 import contextily as cx
 
-FILE_PATH = '.data/Flights/FLIGHT_2.txt'
+FILE_PATH = 'data/ARES_CarTest/cartest-qual-2-28-MAYBEWORKED.csv'
 
 class FlightAnalyzer():
 
@@ -122,30 +122,13 @@ class FlightAnalyzer():
     d_to_targ  = self.df['distance_to_target_m']
     fsm_mode   = self.df['fsm_mode']
 
-    # Altiude vs time with apogee detection
-    fig1, alt_ax = plt.subplots(figsize=(10,6)) 
-
-    alt_ax.set_title('Altitude & Apogee Detection vs Time')
-    alt_ax.set_xlabel('Time (s)')
-    alt_ax.set_ylabel('Altiude (m)')
-    alt_ax.plot(timestamps[1:], altitude[1:], color='blue', linestyle='-', label='Altitude')
-    alt_ax.tick_params(axis='y', color='blue')
-    apo_ax = alt_ax.twinx()
-    apo_ax.set_ylabel("Apogee Detected")
-    apo_ax.plot(timestamps[1:], apog_detec[1:], color='red', linestyle='-', label='Apogee Detected')
-    apo_ax.tick_params(axis='y', color='red')
-    apo_ax.set_ylim((0,1))
-
-    apo_ax.legend()
-    alt_ax.legend()
-
     mask = pos_east.notna() & pos_north.notna()
 
     fig2      = plt.figure(figsize=(10,8))
-    flight_ax = plt.axes(111, projection='3d')
+    flight_ax = fig2.add_subplot(111, projection='3d')
     scatter = flight_ax.scatter(pos_east[mask], pos_north[mask], 
-                                altitude[mask], c=fsm_mode[mask], 
-                                cmap='viridis', s=10)
+                  altitude[mask], c=fsm_mode[mask], 
+                  cmap='viridis', s=10)
     flight_ax.set_title('Position Plot')
     flight_ax.set_xlabel('Position East (m)')
     flight_ax.set_ylabel('Position North (m)')
@@ -153,6 +136,38 @@ class FlightAnalyzer():
 
     cbar = fig2.colorbar(scatter, ax=flight_ax, pad=0.1)
     cbar.set_label('FSM Mode ID')
+
+    # Combined figure: altitude (with apogee detected), apogee_counter, and vertical speed
+    fig3, (alt_ax, ac_ax, vs_ax) = plt.subplots(3, 1, figsize=(10,12), sharex=True)
+
+    # Top: altitude with apogee detected (twin y-axis)
+    alt_ax.set_title('Altitude & Apogee Detection vs Time')
+    alt_ax.set_ylabel('Altitude (m)')
+    alt_ax.plot(timestamps[1:], altitude[1:], color='blue', linestyle='-', label='Altitude')
+    alt_ax.tick_params(axis='y', color='blue')
+    apo_ax = alt_ax.twinx()
+    apo_ax.set_ylabel('Apogee Detected')
+    apo_ax.plot(timestamps[1:], apog_detec[1:], color='red', linestyle='-', label='Apogee Detected')
+    apo_ax.tick_params(axis='y', color='red')
+    apo_ax.set_ylim((0,1))
+    alt_ax.legend(loc='upper left')
+    apo_ax.legend(loc='upper right')
+
+    # Middle: apogee counter
+    ac_ax.set_title('Apogee Counter vs Time')
+    ac_ax.set_ylabel('Apogee Counter')
+    ac_ax.plot(timestamps, self.df['apogee_counter'], color='magenta', linestyle='-')
+    ac_ax.legend(['Apogee Counter'])
+
+    # Bottom: vertical speed
+    vs_ax.set_title('Vertical Speed vs Time')
+    vs_ax.set_xlabel('Time (s)')
+    vs_ax.set_ylabel('v_speed_m_s')
+    vs_ax.plot(timestamps, self.df['v_speed_m_s'], color='cyan', linestyle='-')
+    vs_ax.set_ylim(-5, 5)
+    vs_ax.legend(['v_speed_m_s'])
+
+    fig3.tight_layout()
 
 # 1. Clean and Prepare Data
     df_clean = self.df.dropna(subset=['latitude_deg', 'longitude_deg'])

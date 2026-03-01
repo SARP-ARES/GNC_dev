@@ -2,7 +2,7 @@ import serial
 import time
 
 def catch_data_dump(port_name, baud_rate):
-    with open("DataAnalysis/data/Flights/FLIGHT_DATA_DUMP_3_cartest4.txt", "w") as file:
+    with open("data/ARES_CarTest/***.csv", "w") as file:
         try:
             # Initialize serial with a longer timeout to catch the start
             ser = serial.Serial(port_name, baud_rate, timeout=2)
@@ -43,8 +43,8 @@ def catch_data_dump(port_name, baud_rate):
                         # Optional: Print to console so you can see progress
                         print(decoded_line) 
                         
-                        timestamp = time.strftime("%H:%M:%S", time.localtime())
-                        file.write(f"[{timestamp}] {decoded_line}\n")
+                        # timestamp = time.strftime("%H:%M:%S", time.localtime())
+                        file.write(f"{decoded_line}\n")
                         file.flush() 
                         
         except serial.SerialException as e:
