@@ -18,7 +18,7 @@ def haversine_m(lat1, lon1, lat2, lon2):
     return R * c
 
 # Load the test launch CSV as a pandas DataFrame
-data = pd.read_csv('DataAnalysis/data/PR-Tracker_05-24-2025_14_21_22.csv')
+data = pd.read_csv('data/PR-Tracker_05-24-2025_14_21_22.csv')
 
 print(data.head())
 

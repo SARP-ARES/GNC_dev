@@ -2,7 +2,7 @@ import serial
 import time
 
 def catch_data_dump(port_name, baud_rate):
-    with open("data/ARES_CarTest/***.csv", "w") as file:
+    with open("data/ARES_CarTest/PASCO-LAUNCH-3-7.csv", "w") as file:
         try:
             # Initialize serial with a longer timeout to catch the start
             ser = serial.Serial(port_name, baud_rate, timeout=2)

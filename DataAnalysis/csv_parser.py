@@ -7,7 +7,10 @@ from shapely.geometry import LineString
 import geopandas as gpd
 import contextily as cx
 
-FILE_PATH = 'data/ARES_CarTest/cartest-qual-2-28-MAYBEWORKED.csv'
+FILE_PATH = 'data/ARES_CarTest/PASCO-LAUNCH-3-7-CLEAN.csv'
+
+# MOTOR_POS_COEFICENT = 1.2
+MAX_DEFLECTION = 30
 
 class FlightAnalyzer():
 
@@ -56,10 +59,10 @@ class FlightAnalyzer():
   def motor_analysis(self):
     timestamps = self.df['timestamp_timer']
     cmd_deflection = self.df['fc_cmd']
-    left_position = self.df['leftPosition']
-    right_position = self.df['rightPosition']
-    left_pull = self.df['leftPull']
-    right_pull =self.df['rightPull']
+    left_pos_measured = self.df['leftPosition']
+    right_pos_measured = self.df['rightPosition']
+    left_pos_cmd = self.df['leftPull']
+    right_pos_cmd = self.df['rightPull']
 
     def fc_cmd_axis(ax):
       fc_color='green'
@@ -71,45 +74,38 @@ class FlightAnalyzer():
 
     fig, (pull_ax, pos_ax) = plt.subplots(2, figsize=(10,6))
 
-    pull_ax.set_title('FC_CMD vs Pull')
+    pull_ax.set_title('Control Distributor -- delta_a and motor commands')
     pull_ax.set_xlabel('Time (s)')
-    pull_ax.set_ylabel('Extension')
-    pull_ax.plot(timestamps, left_pull, color='blue', linestyle='-', label='Left Pull')
-    pull_ax.plot(timestamps, right_pull, color='red', linestyle='-', label='Right Pull')
+    pull_ax.set_ylabel('Commanded Position (in)')
+    pull_ax.plot(timestamps, left_pos_cmd, color='blue', linestyle='-', label='Left Command')
+    pull_ax.plot(timestamps, right_pos_cmd, color='red', linestyle='-', label='Right Command')
     pull_ax.tick_params(axis='y', labelcolor='blue')
     pull_ax.legend()
-
-    pos_ax.set_title('FC_CMD vs Positions')
-    pos_ax.set_xlabel('Time (s)')
-    pos_ax.set_ylabel('Position (in)')
-    pos_ax.plot(timestamps,left_position, color='blue', linestyle='-', label='Left Position')
-    pos_ax.plot(timestamps,right_position, color='red', linestyle='-', label='Right Position')
-    pos_ax.tick_params(axis = 'y', labelcolor='blue')
-    pos_ax.legend()
-    
+    # Add the FC command on the same plot but with a different y-axis
     fc_cmd_axis(pull_ax)
-    fc_cmd_axis(pos_ax)
 
     fig.tight_layout()
 
-    fig, ax = plt.subplots(1, figsize=(10,6))
+    fig, (left_ax, right_ax) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-    ax.set_title('Positions Vs Extensions')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Positions')
-    ax.plot(timestamps, left_position, color='blue', linestyle='-', label='Left Position')
-    ax.plot(timestamps, right_position, color='red', linestyle='-', label='Right Position')
-    ax.tick_params(axis='y', labelcolor='blue')
-    p_ax= ax.twinx()
+    # Top subplot: Left motor
+    left_ax.set_title('Left Motor - Commanded vs. Measured Position')
+    left_ax.set_ylabel('Position (in)')
+    left_ax.plot(timestamps, MAX_DEFLECTION * left_pos_cmd, color='blue', linestyle='-', label='Commanded Position')
+    left_ax.plot(timestamps, left_pos_measured, color='purple', linestyle='-', label='Measured Position')
+    left_ax.tick_params(axis='y')
+    left_ax.legend(loc='best')
+    left_ax.grid(True, alpha=0.3)
 
-    ax.legend(loc='upper left')
-
-    p_ax.set_ylabel('Pulls')
-    p_ax.plot(timestamps, left_pull, color='purple', linestyle='-', label='Left Pull')
-    p_ax.plot(timestamps, right_pull, color='orange', linestyle='-', label='Right Pull')
-    p_ax.tick_params(axis='y', labelcolor='orange')
-
-    p_ax.legend(loc='lower left')
+    # Bottom subplot: Right motor
+    right_ax.set_title('Right Motor - Commanded vs. Measured Position')
+    right_ax.set_xlabel('Time (s)')
+    right_ax.set_ylabel('Position (in)')
+    right_ax.plot(timestamps, MAX_DEFLECTION * right_pos_cmd, color='red', linestyle='-', label='Commanded Position')
+    right_ax.plot(timestamps, right_pos_measured, color='orange', linestyle='-', label='Measured Position')
+    right_ax.tick_params(axis='y')
+    right_ax.legend(loc='best')
+    right_ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
 
@@ -138,7 +134,7 @@ class FlightAnalyzer():
     cbar.set_label('FSM Mode ID')
 
     # Combined figure: altitude (with apogee detected), apogee_counter, and vertical speed
-    fig3, (alt_ax, ac_ax, vs_ax) = plt.subplots(3, 1, figsize=(10,12), sharex=True)
+    fig3, (alt_ax, ac_ax, vs_ax) = plt.subplots(3, 1, figsize=(10,8), sharex=True)
 
     # Top: altitude with apogee detected (twin y-axis)
     alt_ax.set_title('Altitude & Apogee Detection vs Time')
@@ -169,7 +165,7 @@ class FlightAnalyzer():
 
     fig3.tight_layout()
 
-# 1. Clean and Prepare Data
+    # 1. Clean and Prepare Data
     df_clean = self.df.dropna(subset=['latitude_deg', 'longitude_deg'])
     route_points = list(zip(df_clean['longitude_deg'], df_clean['latitude_deg']))
     route_geom = LineString(route_points)
@@ -199,7 +195,7 @@ class FlightAnalyzer():
     cmd_deflection = self.df['fc_cmd']
     heading_deg = self.df['heading_deg']
     target_heading_deg = self.df['target_heading_deg']
-    heading_err = heading_deg - target_heading_deg
+    heading_err = self.df['heading_error_deg']
 
     fig, (err_ax, head_ax) = plt.subplots(2, figsize=(10,6))
 
@@ -214,17 +210,17 @@ class FlightAnalyzer():
     err_ax.legend()
 
     fc_ax.set_ylabel('FC CMD')
-    fc_ax.plot(timestamps, cmd_deflection, color='green', linestyle='-', label='Left FC command')
+    fc_ax.plot(timestamps, cmd_deflection, color='green', linestyle='--', label='Left FC command')
     fc_ax.tick_params(axis='y', labelcolor='green')
 
     fc_ax.legend()
 
     # Target vs Heading
-    head_ax.set_title('Target Vs Heading')
+    head_ax.set_title('Target Heading Vs Measured Heading')
     head_ax.set_xlabel('Time (s)')
     head_ax.set_ylabel('Degrees')
-    head_ax.plot(timestamps, heading_deg, color='blue', linestyle='-', label='Heading')
-    head_ax.plot(timestamps, target_heading_deg, color='red', linestyle='-', label='Target')
+    head_ax.plot(timestamps, heading_deg, color='blue', linestyle='-', label='Measured')
+    head_ax.plot(timestamps, target_heading_deg, color='red', linestyle='--', label='Target')
     head_ax.legend()
 
     fig.tight_layout() 
