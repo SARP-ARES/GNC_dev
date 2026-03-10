@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from enum import Enum
 import io
 import re
+from pathlib import Path
 from shapely.geometry import LineString
 import geopandas as gpd
 import contextily as cx
@@ -21,12 +22,25 @@ class FlightAnalyzer():
   
   def __init__(self, flight_data_file_path):
     self.df = self.parse_rocket_log(flight_data_file_path)
+    self.file_path = flight_data_file_path
+    self.output_dir = self._setup_output_directory(flight_data_file_path)
+  
+  def _setup_output_directory(self, file_path):
+    """Create output directory under figs/ based on the data filename"""
+    # Extract filename without extension
+    file_name = Path(file_path).stem
+    
+    # Create directory path under figs/
+    output_dir = Path('figs') / file_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    return output_dir
   
   def plot(self):
      self.motor_analysis()
      self.state_analysis()
      self.control_analysis()
-     plt.show()
+     print(f"All figures saved to: {self.output_dir}")
 
 
   def parse_rocket_log(self, file_path):
@@ -85,6 +99,8 @@ class FlightAnalyzer():
     fc_cmd_axis(pull_ax)
 
     fig.tight_layout()
+    fig.savefig(self.output_dir / 'motor_commands_with_fc.png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
     fig, (left_ax, right_ax) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
@@ -108,6 +124,8 @@ class FlightAnalyzer():
     right_ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
+    fig.savefig(self.output_dir / 'motor_positions_comparison.png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
   def state_analysis(self):
     timestamps = self.df['timestamp_timer']
@@ -115,7 +133,6 @@ class FlightAnalyzer():
     apog_detec = self.df['apogee_detected']
     pos_east   = self.df['pos_east_m']
     pos_north  = self.df['pos_north_m']
-    d_to_targ  = self.df['distance_to_target_m']
     fsm_mode   = self.df['fsm_mode']
 
     mask = pos_east.notna() & pos_north.notna()
@@ -132,6 +149,8 @@ class FlightAnalyzer():
 
     cbar = fig2.colorbar(scatter, ax=flight_ax, pad=0.1)
     cbar.set_label('FSM Mode ID')
+    fig2.savefig(self.output_dir / 'position_3d_plot.png', dpi=150, bbox_inches='tight')
+    plt.close(fig2)
 
     # Combined figure: altitude (with apogee detected), apogee_counter, and vertical speed
     fig3, (alt_ax, ac_ax, vs_ax) = plt.subplots(3, 1, figsize=(10,8), sharex=True)
@@ -164,6 +183,8 @@ class FlightAnalyzer():
     vs_ax.legend(['v_speed_m_s'])
 
     fig3.tight_layout()
+    fig3.savefig(self.output_dir / 'altitude_apogee_vertical_speed.png', dpi=150, bbox_inches='tight')
+    plt.close(fig3)
 
     # 1. Clean and Prepare Data
     df_clean = self.df.dropna(subset=['latitude_deg', 'longitude_deg'])
@@ -189,6 +210,8 @@ class FlightAnalyzer():
     # 6. Final Polish
     ax.set_title("Flight Plot", fontsize=15, pad=20)
     ax.axis('off') # Hide the Mercator meter coordinates for a cleaner look
+    fig.savefig(self.output_dir / 'flight_gps_plot.png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
   def control_analysis(self):
     timestamps = self.df['timestamp_timer']
@@ -223,7 +246,9 @@ class FlightAnalyzer():
     head_ax.plot(timestamps, target_heading_deg, color='red', linestyle='--', label='Target')
     head_ax.legend()
 
-    fig.tight_layout() 
+    fig.tight_layout()
+    fig.savefig(self.output_dir / 'heading_error_and_control.png', dpi=150, bbox_inches='tight')
+    plt.close(fig) 
 
 
 def main():
