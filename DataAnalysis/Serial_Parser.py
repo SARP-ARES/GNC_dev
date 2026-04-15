@@ -2,7 +2,8 @@ import serial
 import time
 
 def catch_data_dump(port_name, baud_rate):
-    with open("data/ARES_CarTest/PASCO-LAUNCH-3-7.csv", "w") as file:
+    with open("CB_TF_4_11_FC_TOP.csv", "w") as file:
+        ser = None
         try:
             # Initialize serial with a longer timeout to catch the start
             ser = serial.Serial(port_name, baud_rate, timeout=2)
@@ -52,13 +53,13 @@ def catch_data_dump(port_name, baud_rate):
         except KeyboardInterrupt:
             print("\nCapture stopped by user.")
         finally:
-            if 'ser' in locals() and ser.is_open:
+            if ser is not None and ser.is_open:
                 ser.close()
 
 if __name__ == '__main__':
     # For your Pi 4 or laptop: check if it's '/dev/ttyACM0' or 'COM4'
-    # SERIAL_PORT = 'COM4' # for windows
-    SERIAL_PORT = '/dev/cu.usbmodem01234567891' # for mac
+    SERIAL_PORT = 'COM4' # for windows
+    # SERIAL_PORT = '/dev/cu.usbmodem01234567891' # for mac
     BAUD_RATE = 115200 
 
     catch_data_dump(SERIAL_PORT, BAUD_RATE)

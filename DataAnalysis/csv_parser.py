@@ -5,9 +5,10 @@ import io
 import re
 from shapely.geometry import LineString
 import geopandas as gpd
+import numpy as np
 import contextily as cx
 
-FILE_PATH = 'data/ARES_CarTest/PASCO-LAUNCH-3-7-CLEAN.csv'
+FILE_PATH = './data/CherryBomb_4_11/CB_TF_4_11_FC_TOP.csv'
 
 # MOTOR_POS_COEFICENT = 1.2
 MAX_DEFLECTION = 30
@@ -26,6 +27,7 @@ class FlightAnalyzer():
      self.motor_analysis()
      self.state_analysis()
      self.control_analysis()
+     self.gps_fix_alt_v_time()
      plt.show()
 
 
@@ -225,6 +227,44 @@ class FlightAnalyzer():
 
     fig.tight_layout() 
 
+  def gps_fix_alt_v_time(self):
+      timestamps = self.df['timestamp_timer']
+      gps_fix = np.array(self.df['gps_fix'])   # ensure it's an array
+      alt = self.df['altitude_m']
+      
+      fig, ax = plt.subplots(1)
+      
+      ax.set_title("GPS Fix, Altitude Vs Time (s)")
+      ax.set_xlabel("Time (s)")
+      ax.set_ylabel("Altitude (m)")
+      ax.plot(timestamps, alt, label="Altitude", color='blue')
+      
+      fix_ax = ax.twinx()
+      fix_ax.set_ylim(0, 1)
+      fix_ax.set_ylabel("GPS Fix")
+      
+      fix_ax.fill_between(
+          timestamps,
+          0,
+          1,
+          where=(gps_fix == 1),
+          alpha=0.5,
+          color='green',
+          label="Fix"
+      )
+      
+      fix_ax.fill_between(
+        timestamps,
+        0,
+        1,
+        where=(gps_fix != 1),
+        alpha=0.5,
+        color='red',
+        label="No Fix"
+      )
+      
+      ax.legend(loc='upper left')
+      fix_ax.legend(loc='center left') 
 
 def main():
    flight_analyzer = FlightAnalyzer(FILE_PATH)
